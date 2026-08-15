@@ -86,3 +86,34 @@ async def test_send_file_existing(comms, tmp_path, monkeypatch):
     )
     assert result.success
     assert "manager@example.com" in result.message
+
+
+@pytest.mark.asyncio
+async def test_send_whatsapp_birthday_wish_expansion(comms, monkeypatch):
+    import webbrowser
+    monkeypatch.setattr(webbrowser, "open", lambda url: True)
+
+    result = await comms.send_whatsapp_message(
+        phone="+919876543210",
+        message="write a birthday wish",
+        auto_send=False,
+    )
+    assert result.success
+    assert "Happy Birthday" in result.data["message"]
+    assert "🎉" in result.data["message"]
+
+
+@pytest.mark.asyncio
+async def test_send_email_absent_letter_expansion(comms, monkeypatch):
+    import webbrowser
+    monkeypatch.setattr(webbrowser, "open", lambda url: True)
+
+    result = await comms.send_email(
+        to="manager@company.com",
+        subject="absent letter",
+        body="",
+    )
+    assert result.success
+    assert "Leave Application" in result.data["subject"]
+    assert "leave of absence" in result.data["body"]
+

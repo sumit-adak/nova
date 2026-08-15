@@ -61,6 +61,83 @@ class CommunicationCommands:
             logger.error("Failed to open WhatsApp: %s", exc)
             return ActionResult(success=False, message=f"Failed to open WhatsApp: {exc}")
 
+    def _expand_message_content(self, text: str, mode: str = "whatsapp") -> tuple[str, str]:
+        """Expand short prompts (e.g. 'birthday wish', 'absent letter') into full, rich, professional messages."""
+        clean = text.strip()
+        lower = clean.lower()
+
+        # Birthday wishes
+        if any(k in lower for k in ("birthday wish", "happy birthday", "wish birthday", "bday wish", "bday")):
+            if mode == "email":
+                sub = "Wishing You a Very Happy Birthday! 🎉"
+                body = (
+                    "Dear Friend,\n\n"
+                    "Wishing you a very Happy Birthday! 🎂✨ May this special day bring you immense joy, "
+                    "happiness, and wonderful memories. Wishing you good health, prosperity, and great success "
+                    "in the year ahead!\n\n"
+                    "Have a fantastic celebration!\n\n"
+                    "Warmest regards,\n[Your Name]"
+                )
+                return sub, body
+            else:
+                return "Happy Birthday", (
+                    "🎉 Happy Birthday! 🎂 Wishing you a fantastic day filled with happiness, laughter, "
+                    "and success in the year ahead! May all your dreams come true! 🎈✨"
+                )
+
+        # Absent / Leave letter
+        if any(k in lower for k in ("absent letter", "leave letter", "leave application", "absence letter", "absent", "leave")):
+            sub = "Leave Application - Absence Notification"
+            body = (
+                "Dear Sir/Madam,\n\n"
+                "I am writing to formally request a leave of absence and notify you that I will be unable to attend today due to "
+                "unforeseen personal circumstances. I will ensure all pending tasks and responsibilities "
+                "are prioritized and completed promptly upon my return.\n\n"
+                "Thank you very much for your understanding and support.\n\n"
+                "Sincerely,\n[Your Name]"
+            )
+            return sub, body
+
+        # Sick leave
+        if any(k in lower for k in ("sick leave", "sick letter", "fever", "unwell", "doctor")):
+            sub = "Leave Application - Sick Leave"
+            body = (
+                "Dear Sir/Madam,\n\n"
+                "I am writing to inform you that I am currently unwell and will not be able to attend today. "
+                "I am taking the necessary rest/medication and will keep you updated regarding my recovery.\n\n"
+                "Thank you for your understanding.\n\n"
+                "Sincerely,\n[Your Name]"
+            )
+            return sub, body
+
+        # Resignation letter
+        if "resignation" in lower:
+            sub = "Formal Resignation Letter"
+            body = (
+                "Dear Sir/Madam,\n\n"
+                "Please accept this letter as formal notification of my resignation from my position. "
+                "I am deeply grateful for the opportunities and experiences during my time with the team.\n\n"
+                "I will do everything possible to ensure a smooth transition of my responsibilities.\n\n"
+                "Sincerely,\n[Your Name]"
+            )
+            return sub, body
+
+        # Congratulations
+        if any(k in lower for k in ("congratulation", "congrats", "achievement")):
+            return "Congratulations", (
+                "🎉 Huge congratulations on your wonderful achievement! 🌟 Wishing you continued "
+                "success and greatness in all your upcoming endeavors! 🚀✨"
+            )
+
+        # Thank you note
+        if any(k in lower for k in ("thank you", "thanks note", "appreciation")):
+            return "Thank You", (
+                "Thank you so much for your assistance and support! It is truly appreciated. "
+                "Looking forward to connecting with you again! ✨"
+            )
+
+        return "", clean
+
     async def send_whatsapp_message(
         self,
         phone: str = "",
@@ -77,9 +154,13 @@ class CommunicationCommands:
             )
 
         clean_number = self._normalize_phone(target_num)
-        msg_text = message.strip() if message else ""
-        encoded_msg = urllib.parse.quote(msg_text)
+        raw_msg = message.strip() if message else ""
 
+        # Check if message is a short intent that should be expanded into a full rich text/letter
+        _, expanded_msg = self._expand_message_content(raw_msg, mode="whatsapp")
+        final_msg = expanded_msg if expanded_msg else raw_msg
+
+        encoded_msg = urllib.parse.quote(final_msg)
         web_url = f"https://web.whatsapp.com/send?phone={clean_number}&text={encoded_msg}"
         protocol_url = f"whatsapp://send?phone={clean_number}&text={encoded_msg}"
 
@@ -95,12 +176,16 @@ class CommunicationCommands:
             if not opened:
                 webbrowser.open(web_url)
 
-            # If auto_send is True, trigger Enter key via PyAutoGUI after a brief delay in background
-            if auto_send and msg_text:
+            # Auto-send message reliably with multi-attempt enter key
+            if auto_send and final_msg:
                 async def _auto_press_enter() -> None:
                     try:
-                        await asyncio.sleep(5)
+                        # Attempt 1 after 4 seconds (for fast app or existing tab)
+                        await asyncio.sleep(4)
                         import pyautogui
+                        pyautogui.press("enter")
+                        # Attempt 2 after additional 3 seconds (for slower loading web pages)
+                        await asyncio.sleep(3)
                         pyautogui.press("enter")
                     except Exception:
                         pass
@@ -108,13 +193,13 @@ class CommunicationCommands:
                 asyncio.create_task(_auto_press_enter())
 
             recipient_display = f"'{target_num}'" if target_num else "recipient"
-            msg_display = f" with message: '{msg_text}'" if msg_text else ""
+            preview = final_msg[:60] + "..." if len(final_msg) > 60 else final_msg
             return ActionResult(
                 success=True,
-                message=f"Opening WhatsApp chat for {recipient_display}{msg_display}.",
+                message=f"Sending WhatsApp message to {recipient_display}: \"{preview}\"",
                 data={
                     "phone": clean_number,
-                    "message": msg_text,
+                    "message": final_msg,
                     "web_url": web_url,
                 },
             )
@@ -134,24 +219,30 @@ class CommunicationCommands:
     ) -> ActionResult:
         """Compose an email with subject, body, and optional attachment."""
         recipient = to.strip() if to else ""
-        sub = subject.strip() if subject else "Message from NOVA"
-        body_text = body.strip() if body else ""
+        raw_body = body.strip() if body else ""
+        raw_sub = subject.strip() if subject else ""
+
+        # Auto-expand template topics if body/subject asks for letter/wish
+        auto_sub, expanded_body = self._expand_message_content(f"{raw_sub} {raw_body}".strip(), mode="email")
+        if auto_sub and (not raw_sub or any(k in raw_sub.lower() for k in ("absent", "leave", "sick", "birthday", "resignation", "congratulat", "thank"))):
+            final_sub = auto_sub
+        else:
+            final_sub = raw_sub or (auto_sub or "Message from NOVA")
+
+        final_body = expanded_body if (expanded_body and expanded_body != f"{raw_sub} {raw_body}".strip()) else (raw_body or "Hello,")
 
         if attachment_path:
             att_path = Path(attachment_path)
             if att_path.exists():
-                body_text = f"{body_text}\n\n[Attachment: {att_path.name} located at {att_path.resolve()}]".strip()
+                final_body = f"{final_body}\n\n[Attachment: {att_path.name} located at {att_path.resolve()}]".strip()
             else:
                 logger.warning("Attachment file does not exist: %s", attachment_path)
 
         encoded_to = urllib.parse.quote(recipient)
-        encoded_sub = urllib.parse.quote(sub)
-        encoded_body = urllib.parse.quote(body_text)
+        encoded_sub = urllib.parse.quote(final_sub)
+        encoded_body = urllib.parse.quote(final_body)
 
-        # Build standard mailto URL
         mailto_url = f"mailto:{encoded_to}?subject={encoded_sub}&body={encoded_body}"
-
-        # Web Gmail compose URL fallback
         gmail_url = f"https://mail.google.com/mail/?view=cm&fs=1&to={encoded_to}&su={encoded_sub}&body={encoded_body}"
 
         try:
@@ -169,11 +260,11 @@ class CommunicationCommands:
             recip_info = f" to '{recipient}'" if recipient else ""
             return ActionResult(
                 success=True,
-                message=f"Composing email{recip_info} with subject '{sub}'.",
+                message=f"Composing professional email{recip_info} with subject '{final_sub}'.",
                 data={
                     "to": recipient,
-                    "subject": sub,
-                    "body": body_text,
+                    "subject": final_sub,
+                    "body": final_body,
                     "attachment": attachment_path,
                     "url": mailto_url if opened else gmail_url,
                 },
