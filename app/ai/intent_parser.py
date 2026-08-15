@@ -14,6 +14,58 @@ class OfflineIntentParser:
     """Rule-based intent parser for offline mode and local fallback."""
 
     PATTERNS: list[tuple[re.Pattern, str, dict[str, Any] | None]] = [
+        # WhatsApp Messaging & Open
+        (re.compile(r"^(?:open whatsapp and )?(?:send (?:a )?(?:whatsapp(?: message)?|message on whatsapp) to|whatsapp) (\+?[\d\-]+|\w+)(?: (?:saying|with message|message) (?:that )?)?[:\s]+['\"]?(.+?)['\"]?$", re.I),
+         "send_whatsapp_message", None),
+        (re.compile(r"^open whatsapp and (?:search|find) (?:for )?(\+?[\d\-]+|\w+)(?: (?:and )?(?:send|write|type) (?:message )?['\"]?(.+?)['\"]?)?$", re.I),
+         "send_whatsapp_message", None),
+        (re.compile(r"^send whatsapp to (\+?[\d\-]+|\w+)[:\s]+(.+)", re.I),
+         "send_whatsapp_message", None),
+        (re.compile(r"^whatsapp (\+?[\d\-]+|\w+)[:\s]+(.+)", re.I),
+         "send_whatsapp_message", None),
+        (re.compile(r"^open whatsapp\b", re.I),
+         "open_whatsapp", {}),
+
+        # Email Writing & Sending
+        (re.compile(r"^(?:send|write|compose) (?:an? )?email to (\S+@\S+|\S+)(?: (?:with )?subject ['\"]?(.+?)['\"]?)?(?: (?:and )?(?:with )?body ['\"]?(.+?)['\"]?)?$", re.I),
+         "send_email", None),
+        (re.compile(r"^(?:send|write|compose) (?:an? )?email to (\S+@\S+|\S+) (?:saying|with message) (?:that )?['\"]?(.+?)['\"]?$", re.I),
+         "send_email", None),
+        (re.compile(r"^email (\S+@\S+|\S+)[:\s]+['\"]?(.+?)['\"]?$", re.I),
+         "send_email", None),
+
+        # File Sending / Sharing
+        (re.compile(r"^send (?:the )?file (.+?) (?:to|via) (email|whatsapp)(?: to (\S+))?$", re.I),
+         "send_file", None),
+        (re.compile(r"^send (?:the )?file (.+?) to (\S+)$", re.I),
+         "send_file", None),
+
+        # Music & Media Playback (Spotify & YouTube)
+        (re.compile(r"^(?:open spotify and )?play (?:any |some |a )?(?:music|songs?)$", re.I),
+         "play_music", {"query": "Today's Top Hits", "platform": "spotify"}),
+        (re.compile(r"^(?:open spotify and )?play (?:the song |the track |song |track )?(.+?)(?: on (spotify|youtube))$", re.I),
+         "play_music", None),
+        (re.compile(r"^open spotify and play (?:the song |the track |song |track )?(.+)", re.I),
+         "play_music", {"platform": "spotify"}),
+        (re.compile(r"^play (?:the song |the track |the video |song |track |video )?(.+?) on (spotify|youtube)$", re.I),
+         "play_music", None),
+        (re.compile(r"^play (?:the song |the track |song |track )?(.+)", re.I),
+         "play_music", {"platform": "spotify"}),
+
+        # Open & Search / Web Search
+        (re.compile(r"^(?:open (?:the )?(?:browser|chrome|google|edge) and )?open and search (?:for |about )?(.+)", re.I),
+         "search_web", {"engine": "google"}),
+        (re.compile(r"^open (youtube|spotify|google|bing|github|stackoverflow|duckduckgo|reddit|wikipedia) and search (?:for |about )?(.+)", re.I),
+         "search_web", None),
+        (re.compile(r"^search (?:for |about )?(.+?) on (youtube|spotify|google|bing|github|stackoverflow|duckduckgo|reddit|wikipedia)$", re.I),
+         "search_web", None),
+        (re.compile(r"^search (?:on )?(youtube|spotify|google|bing|github|stackoverflow|duckduckgo|reddit|wikipedia) (?:for |about )?(.+)", re.I),
+         "search_web", None),
+        (re.compile(r"^search (?:this )?error (.+)", re.I),
+         "search_error", None),
+        (re.compile(r"^search (?:for |about )?(.+)", re.I),
+         "search_web", None),
+
         # Specific applications
         (re.compile(r"open (?:vs ?code|visual studio code|code)\b", re.I),
          "open_application", {"app": "vscode"}),
@@ -53,10 +105,12 @@ class OfflineIntentParser:
          "read_file", None),
 
         # Web & Dev URLs
-        (re.compile(r"open github", re.I),
+        (re.compile(r"open github\b", re.I),
          "open_github", {}),
-        (re.compile(r"open localhost", re.I),
+        (re.compile(r"open localhost\b", re.I),
          "open_localhost", {}),
+        (re.compile(r"open (?:youtube|yt)\b", re.I),
+         "open_url", {"url": "https://www.youtube.com"}),
         (re.compile(r"open (https?://\S+)", re.I),
          "open_url", None),
 
@@ -94,12 +148,6 @@ class OfflineIntentParser:
         (re.compile(r"take (?:a )?screenshot", re.I),
          "take_screenshot", {}),
 
-        # Search & Errors
-        (re.compile(r"search (?:this )?error (.+)", re.I),
-         "search_error", None),
-        (re.compile(r"search (?:for )?(.+)", re.I),
-         "search_web", None),
-
         # Files & Folders
         (re.compile(r"delete folder (.+)", re.I),
          "delete_folder", None),
@@ -133,6 +181,16 @@ class OfflineIntentParser:
         "jupyter": "jupyter", "jupyter notebook": "jupyter",
     }
 
+    GENERIC_SONG_NAMES = {
+        "any song", "some song", "a song", "music", "song", "any",
+        "something", "random song", "random", "any music", "songs",
+    }
+
+    KNOWN_ENGINES = {
+        "youtube", "spotify", "google", "bing", "github",
+        "stackoverflow", "duckduckgo", "reddit", "wikipedia",
+    }
+
     def parse(self, user_input: str) -> dict[str, Any]:
         """Parse user input into structured single or multi-action intents."""
         text = user_input.strip()
@@ -159,13 +217,22 @@ class OfflineIntentParser:
                     "actions": actions_list,
                     "response": "Executing multi-step workflow: " + ", ".join(responses),
                 }
+            elif len(actions_list) == 1:
+                return {
+                    "type": "action",
+                    "action": actions_list[0]["action"],
+                    "parameters": actions_list[0]["parameters"],
+                    "response": responses[0],
+                }
 
         # Otherwise parse as single intent
         return self._parse_single(text)
 
     def _split_compound_input(self, text: str) -> list[str]:
         """Split compound request on 'and then', 'then', or 'and'."""
-        # Normalize and split
+        # Don't split unified commands like "open and search ...", "open <engine> and search ...", or "open whatsapp and ..."
+        if re.match(r"^open (?:and search|\w+ and search|whatsapp and (?:search|find|send|write))\b", text, re.I):
+            return [text]
         parts = re.split(r"\s+(?:and\s+then|then|and)\s+", text, flags=re.I)
         cleaned = [p.strip() for p in parts if p.strip()]
         return cleaned if len(cleaned) > 1 else [text]
@@ -178,6 +245,93 @@ class OfflineIntentParser:
                 continue
 
             params = dict(fixed_params) if fixed_params is not None else {}
+
+            if action == "send_whatsapp_message":
+                groups = [g for g in match.groups() if g is not None]
+                if len(groups) >= 2:
+                    params["phone"] = groups[0].strip()
+                    params["recipient"] = groups[0].strip()
+                    params["message"] = groups[1].strip()
+                elif len(groups) == 1:
+                    params["phone"] = groups[0].strip()
+                    params["recipient"] = groups[0].strip()
+                    params["message"] = ""
+
+            if action == "open_whatsapp":
+                if match.groups() and match.group(1):
+                    params["search"] = match.group(1).strip()
+                else:
+                    params["search"] = ""
+
+            if action == "send_email":
+                groups = [g for g in match.groups() if g is not None]
+                if len(groups) >= 3:
+                    params["to"] = groups[0].strip()
+                    params["subject"] = groups[1].strip()
+                    params["body"] = groups[2].strip()
+                elif len(groups) == 2:
+                    params["to"] = groups[0].strip()
+                    params["subject"] = "Message from NOVA"
+                    params["body"] = groups[1].strip()
+                elif len(groups) == 1:
+                    params["to"] = groups[0].strip()
+                    params["subject"] = "Message from NOVA"
+                    params["body"] = ""
+
+            if action == "send_file":
+                groups = [g for g in match.groups() if g is not None]
+                if len(groups) >= 3:
+                    params["path"] = groups[0].strip()
+                    params["channel"] = groups[1].strip().lower()
+                    params["recipient"] = groups[2].strip()
+                elif len(groups) == 2:
+                    params["path"] = groups[0].strip()
+                    target = groups[1].strip()
+                    if "@" in target:
+                        params["recipient"] = target
+                        params["channel"] = "email"
+                    elif re.match(r"^\+?\d+$", target):
+                        params["recipient"] = target
+                        params["channel"] = "whatsapp"
+                    else:
+                        params["recipient"] = target
+                        params["channel"] = "email"
+                elif len(groups) == 1:
+                    params["path"] = groups[0].strip()
+
+            if action == "play_music":
+                if "query" not in params:
+                    if match.groups() and match.group(1):
+                        q = match.group(1).strip()
+                        if q.lower() in self.GENERIC_SONG_NAMES:
+                            q = "Today's Top Hits"
+                        params["query"] = q
+                    else:
+                        params["query"] = "Today's Top Hits"
+
+                if "platform" not in params:
+                    if len(match.groups()) > 1 and match.group(2):
+                        params["platform"] = match.group(2).lower()
+                    else:
+                        params["platform"] = "spotify"
+
+            if action == "search_web":
+                groups = [g for g in match.groups() if g is not None]
+                if "query" not in params:
+                    if len(groups) >= 2:
+                        g0, g1 = groups[0].strip(), groups[1].strip()
+                        if g0.lower() in self.KNOWN_ENGINES:
+                            params["engine"] = g0.lower()
+                            params["query"] = g1
+                        elif g1.lower() in self.KNOWN_ENGINES:
+                            params["query"] = g0
+                            params["engine"] = g1.lower()
+                        else:
+                            params["query"] = g0
+                    elif len(groups) == 1:
+                        params["query"] = groups[0].strip()
+                if "engine" not in params:
+                    params["engine"] = "google"
 
             if action == "launch_project" and "project_name" not in params and match.groups():
                 params["project_name"] = match.group(1)
@@ -218,9 +372,6 @@ class OfflineIntentParser:
                     params["mode"] = "append"
                     params["content"] = "\n<!-- Updated by NOVA assistant -->"
 
-            if action == "search_web" and match.groups():
-                params["query"] = match.group(1)
-
             if action == "search_error" and match.groups():
                 params["error"] = match.group(1)
 
@@ -257,9 +408,23 @@ class OfflineIntentParser:
     @staticmethod
     def _generate_response(action: str, params: dict[str, Any]) -> str:
         """Generate a friendly response for an action."""
+        engine = params.get("engine", "google")
+        engine_str = f" on {engine.title()}" if engine and engine != "google" else ""
+        query_val = params.get("query", "")
+        platform_str = params.get("platform", "Spotify").title()
+        recipient_val = params.get("recipient", params.get("phone", params.get("to", "")))
+
         responses = {
+            "send_whatsapp_message": f"Opening WhatsApp chat for '{recipient_val}' with your message.",
+            "open_whatsapp": f"Opening WhatsApp{' with search ' + params.get('search', '') if params.get('search') else ''}.",
+            "send_email": f"Composing email to '{params.get('to', '')}' with subject '{params.get('subject', 'Message from NOVA')}'.",
+            "send_file": f"Sending file '{params.get('path', '')}' to '{recipient_val}' via {params.get('channel', 'email').title()}.",
+            "play_music": f"Playing {query_val} on {platform_str}." if query_val else f"Playing music on {platform_str}.",
+            "search_web": f"Searching for: {query_val}{engine_str}.",
+            "search_error": f"Searching error: {params.get('error', '')}.",
             "launch_project": f"Opening {params.get('project_name', 'project')}.",
             "open_application": f"Opening {params.get('app', 'application')}.",
+            "close_application": f"Closing {params.get('app', 'application')}.",
             "git_sync": f"Syncing and pushing changes to {params.get('branch', 'main')}.",
             "git_push": f"Pushing changes to {params.get('branch', 'main')}.",
             "git_commit": f"Committing changes with message '{params.get('message', 'Update files')}'.",
@@ -273,11 +438,14 @@ class OfflineIntentParser:
             "get_disk_usage": "Checking storage usage.",
             "get_system_info": "Gathering system information.",
             "take_screenshot": "Taking a screenshot.",
-            "search_web": f"Searching for: {params.get('query', '')}.",
             "open_github": "Opening GitHub.",
             "open_localhost": "Opening localhost.",
+            "open_url": f"Opening {params.get('url', 'web page')}.",
+            "open_folder": f"Opening folder {params.get('path', '')}.",
+            "open_file": f"Opening file {params.get('path', '')}.",
             "set_volume": f"Setting volume to {params.get('level', 50)}%.",
             "start_timer": f"Starting timer for {params.get('seconds', 60)} seconds.",
             "list_projects": "Listing your projects.",
         }
         return responses.get(action, "On it.")
+

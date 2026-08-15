@@ -2,6 +2,7 @@
 
 from app.commands.applications import ApplicationLauncher
 from app.commands.browser import BrowserCommands
+from app.commands.communications import CommunicationCommands
 from app.commands.files import FileCommands
 from app.commands.git_tools import GitCommands
 from app.commands.projects import ProjectCommands
@@ -21,6 +22,7 @@ def build_registry(config: ConfigManager | None = None) -> CommandRegistry:
     files = FileCommands()
     git = GitCommands()
     browser = BrowserCommands(config)
+    comms = CommunicationCommands(config)
     system = SystemCommands()
     projects = ProjectCommands(config, apps)
     utilities = UtilityCommands()
@@ -114,8 +116,28 @@ def build_registry(config: ConfigManager | None = None) -> CommandRegistry:
         PermissionLevel.SAFE, browser.search_web, ["query", "engine"],
     )
     registry.register(
+        "play_music", "Play music, songs, or artists on Spotify or YouTube",
+        PermissionLevel.SAFE, browser.play_music, ["query", "platform"],
+    )
+    registry.register(
         "search_error", "Search for a programming error",
         PermissionLevel.SAFE, browser.search_error, ["error"],
+    )
+    registry.register(
+        "send_whatsapp_message", "Send or compose a message on WhatsApp to a phone number or recipient",
+        PermissionLevel.SAFE, comms.send_whatsapp_message, ["phone", "message", "recipient"],
+    )
+    registry.register(
+        "open_whatsapp", "Open WhatsApp desktop application or WhatsApp Web",
+        PermissionLevel.SAFE, comms.open_whatsapp, ["search"],
+    )
+    registry.register(
+        "send_email", "Compose and send an email with subject, body, and attachment",
+        PermissionLevel.SAFE, comms.send_email, ["to", "subject", "body", "attachment_path"],
+    )
+    registry.register(
+        "send_file", "Send or share a file via Email or WhatsApp",
+        PermissionLevel.SAFE, comms.send_file, ["path", "recipient", "channel"],
     )
     registry.register(
         "open_github", "Open GitHub website",

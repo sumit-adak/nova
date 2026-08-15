@@ -100,29 +100,43 @@ class GitCommands:
 
     async def git_push(
         self,
-        branch: str = "main",
+        branch: str = "",
         remote: str = "origin",
         repo_path: str = "",
     ) -> ActionResult:
         """Push committed changes to remote repository."""
         cwd = self._resolve_repo_dir(repo_path)
-        target_branch = branch.strip() if branch else "main"
         target_remote = remote.strip() if remote else "origin"
+
+        # Detect current branch
+        code_b, current_branch, _ = self._run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd)
+        active_branch = current_branch if code_b == 0 and current_branch else "master"
+
+        target_branch = branch.strip() if branch else active_branch
+
+        # Try push to target branch
         code, stdout, stderr = self._run_git(["push", target_remote, target_branch], cwd)
         if code != 0:
-            # Try plain git push as fallback
-            code2, stdout2, stderr2 = self._run_git(["push"], cwd)
-            if code2 != 0:
-                return ActionResult(
-                    success=False,
-                    message=f"Git push failed: {stderr or stderr2 or stdout2}",
-                )
-            stdout = stdout2
+            # If target branch was specified as 'main' but local is 'master' (or vice versa), try pushing local branch to target remote ref
+            if active_branch != target_branch:
+                code, stdout, stderr = self._run_git(["push", target_remote, f"{active_branch}:{target_branch}"], cwd)
+
+            if code != 0:
+                # Try simple git push
+                code, stdout, stderr = self._run_git(["push", target_remote, active_branch], cwd)
+                if code != 0:
+                    code, stdout, stderr = self._run_git(["push"], cwd)
+
+        if code != 0:
+            return ActionResult(
+                success=False,
+                message=f"Git push failed: {stderr or stdout or 'Check remote configuration.'}",
+            )
 
         return ActionResult(
             success=True,
-            message=f"Pushed to {target_remote}/{target_branch} in {cwd.name}.",
-            data={"remote": target_remote, "branch": target_branch, "cwd": str(cwd)},
+            message=f"Pushed to {target_remote}/{target_branch or active_branch} in {cwd.name}.",
+            data={"remote": target_remote, "branch": target_branch or active_branch, "cwd": str(cwd)},
         )
 
     async def git_sync(

@@ -38,3 +38,23 @@ async def test_get_memory_usage(registry):
 async def test_search_web_empty(registry):
     result = await registry.execute("search_web", {"query": ""})
     assert not result.success
+
+
+@pytest.mark.asyncio
+async def test_play_music_action(registry, monkeypatch):
+    import webbrowser
+    monkeypatch.setattr(webbrowser, "open", lambda url: True)
+    result = await registry.execute("play_music", {"query": "Starboy", "platform": "spotify"})
+    assert result.success
+    assert "Spotify" in result.message
+    assert result.data["query"] == "Starboy"
+
+
+@pytest.mark.asyncio
+async def test_play_music_youtube(registry, monkeypatch):
+    import webbrowser
+    monkeypatch.setattr(webbrowser, "open", lambda url: True)
+    result = await registry.execute("play_music", {"query": "Bohemian Rhapsody", "platform": "youtube"})
+    assert result.success
+    assert "YouTube" in result.message
+
