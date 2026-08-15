@@ -1,0 +1,87 @@
+{
+  "chrome": {
+    "name": "Google Chrome",
+    "paths": [
+      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+      "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+    ]
+  },
+  "edge": {
+    "name": "Microsoft Edge",
+    "paths": [
+      "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe"
+    ]
+  },
+  "firefox": {
+    "name": "Mozilla Firefox",
+    "paths": [
+      "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
+      "C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe"
+    ]
+  },
+  "vscode": {
+    "name": "Visual Studio Code",
+    "paths": [
+      "C:\\Users\\SUMIT ADAK\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe",
+      "C:\\Program Files\\Microsoft VS Code\\Code.exe"
+    ]
+  },
+  "terminal": {
+    "name": "Windows Terminal",
+    "paths": [
+      "C:\\Users\\SUMIT ADAK\\AppData\\Local\\Microsoft\\WindowsApps\\wt.exe",
+      "C:\\Users\\SUMIT ADAK\\AppData\\Local\\Microsoft\\WindowsApps\\Microsoft.WindowsTerminal_8wekyb3d8bbwe\\wt.exe"
+    ]
+  },
+  "powershell": {
+    "name": "PowerShell",
+    "paths": [
+      "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+      "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+    ]
+  },
+  "notepad": {
+    "name": "Notepad",
+    "paths": [
+      "C:\\Windows\\System32\\notepad.exe"
+    ]
+  },
+  "calculator": {
+    "name": "Calculator",
+    "paths": [
+      "C:\\Windows\\System32\\calc.exe"
+    ]
+  },
+  "explorer": {
+    "name": "File Explorer",
+    "paths": [
+      "C:\\Windows\\explorer.exe"
+    ]
+  },
+  "taskmanager": {
+    "name": "Task Manager",
+    "paths": [
+      "C:\\Windows\\System32\\Taskmgr.exe"
+    ]
+  },
+  "discord": {
+    "name": "Discord",
+    "paths": [
+      "C:\\Users\\SUMIT ADAK\\AppData\\Local\\Discord\\Update.exe",
+      "C:\\Users\\SUMIT ADAK\\AppData\\Local\\Discord\\app-1.0.9003\\Discord.exe"
+    ],
+    "args": "--processStart Discord.exe"
+  },
+  "spotify": {
+    "name": "Spotify",
+    "paths": [
+      "C:\\Users\\SUMIT ADAK\\AppData\\Local\\Microsoft\\WindowsApps\\Spotify.exe",
+      "C:\\Users\\SUMIT ADAK\\AppData\\Local\\Spotify\\Spotify.exe"
+    ]
+  },
+  "jupyter": {
+    "name": "Jupyter Notebook",
+    "paths": [],
+    "command": "jupyter notebook"
+  }
+}
