@@ -4,14 +4,43 @@ import shutil
 import subprocess
 from typing import Any
 from pydantic import BaseModel, Field
+from nova_app.integrations.vscode import get_vscode_client
 
 KNOWN_APPS: dict[str, list[str]] = {
     "notepad": ["notepad.exe"],
     "calculator": ["calc.exe"],
     "calc": ["calc.exe"],
-    "vscode": ["code.cmd", "code.exe", "code"],
-    "code": ["code.cmd", "code.exe", "code"],
+    "vscode": [
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\Microsoft VS Code\Code.exe"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\Microsoft VS Code\bin\code.cmd"),
+        r"C:\Program Files\Microsoft VS Code\Code.exe",
+        "code.cmd", "code.exe", "code"
+    ],
+    "vs code": [
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\Microsoft VS Code\Code.exe"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\Microsoft VS Code\bin\code.cmd"),
+        r"C:\Program Files\Microsoft VS Code\Code.exe",
+        "code.cmd", "code.exe", "code"
+    ],
+    "visual studio code": [
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\Microsoft VS Code\Code.exe"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\Microsoft VS Code\bin\code.cmd"),
+        r"C:\Program Files\Microsoft VS Code\Code.exe",
+        "code.cmd", "code.exe", "code"
+    ],
+    "code": [
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\Microsoft VS Code\Code.exe"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\Microsoft VS Code\bin\code.cmd"),
+        r"C:\Program Files\Microsoft VS Code\Code.exe",
+        "code.cmd", "code.exe", "code"
+    ],
     "chrome": [
+        "chrome.exe",
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
+    ],
+    "google chrome": [
         "chrome.exe",
         r"C:\Program Files\Google\Chrome\Application\chrome.exe",
         r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
@@ -22,10 +51,17 @@ KNOWN_APPS: dict[str, list[str]] = {
         r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
         r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
     ],
+    "microsoft edge": [
+        "msedge.exe",
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+    ],
     "explorer": ["explorer.exe"],
+    "file explorer": ["explorer.exe"],
     "terminal": ["wt.exe", "powershell.exe", "cmd.exe"],
+    "windows terminal": ["wt.exe", "powershell.exe", "cmd.exe"],
     "cmd": ["cmd.exe"],
-    "powershell": ["powershell.exe"],
+    "powershell": ["powershell.exe", "pwsh.exe"],
 }
 
 
@@ -41,7 +77,19 @@ def open_application_executor(args: OpenApplicationArgs) -> dict[str, Any]:
     """Open an installed Windows application safely."""
     app_key = args.app_name.lower().strip()
 
-    # 1. Check known aliases
+    # 1. VS Code special resolution
+    if app_key in ["vs code", "vscode", "visual studio code", "code"]:
+        vscode = get_vscode_client()
+        exec_path = vscode.find_vscode_executable()
+        if exec_path:
+            subprocess.Popen([exec_path], shell=False)
+            return {
+                "status": "launched",
+                "app_name": "VS Code",
+                "executable": exec_path,
+            }
+
+    # 2. Check known aliases
     candidate_paths = KNOWN_APPS.get(app_key, [args.app_name])
 
     for target in candidate_paths:
@@ -55,7 +103,7 @@ def open_application_executor(args: OpenApplicationArgs) -> dict[str, Any]:
                 "executable": found_bin,
             }
 
-    # 2. Try directly running via os.startfile for Windows protocols / shell items
+    # 3. Try directly running via os.startfile for Windows protocols / shell items
     try:
         os.startfile(args.app_name)
         return {

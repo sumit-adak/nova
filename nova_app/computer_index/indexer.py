@@ -80,3 +80,18 @@ class FileIndexer:
 
         logger.info("File indexing finished", directory=str(dir_path), indexed_count=indexed_count)
         return indexed_count
+
+
+_file_indexer_instance: FileIndexer | None = None
+
+
+def get_file_indexer() -> FileIndexer:
+    """Get singleton FileIndexer instance."""
+    global _file_indexer_instance
+    if _file_indexer_instance is None:
+        _file_indexer_instance = FileIndexer()
+    return _file_indexer_instance
+
+
+# Alias for backward compatibility
+get_computer_indexer = get_file_indexer

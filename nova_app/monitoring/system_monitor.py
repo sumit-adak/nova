@@ -12,6 +12,7 @@ from nova_app.monitoring.models import (
     HighRamAlertEvent,
     LowBatteryAlertEvent,
     MetricsSnapshotEvent,
+    SystemMetrics,
 )
 
 logger = structlog.get_logger(__name__)
@@ -25,87 +26,107 @@ class SystemMonitorService:
         self._is_running = False
         self._task: asyncio.Task | None = None
 
-    async def collect_snapshot(self) -> SystemMetricsSnapshot:
-        """Collect current metrics snapshot and persist to DB."""
+    async def get_current_metrics(self) -> SystemMetrics:
+        """Fetch real-time snapshot of system hardware resources."""
         cpu = psutil.cpu_percent(interval=0.1)
         ram = psutil.virtual_memory()
         disk = psutil.disk_usage("C:\\" if psutil.WINDOWS else "/")
-        battery = psutil.sensors_battery()
-        net = psutil.net_io_counters()
 
-        snapshot = SystemMetricsSnapshot(
-            timestamp=datetime.now(timezone.utc),
-            cpu_pct=cpu,
-            ram_pct=ram.percent,
-            disk_pct=disk.percent,
-            net_sent_kb=round(net.bytes_sent / 1024, 2),
-            net_recv_kb=round(net.bytes_recv / 1024, 2),
-            battery_pct=battery.percent if battery else None,
+        battery_pct = None
+        power_plugged = None
+        try:
+            battery = psutil.sensors_battery()
+            if battery:
+                battery_pct = battery.percent
+                power_plugged = battery.power_plugged
+        except Exception:
+            pass
+
+        return SystemMetrics(
+            cpu_percent=cpu,
+            ram_percent=ram.percent,
+            ram_used_gb=round(ram.used / (1024**3), 2),
+            ram_total_gb=round(ram.total / (1024**3), 2),
+            disk_percent=disk.percent,
+            disk_free_gb=round(disk.free / (1024**3), 2),
+            battery_percent=battery_pct,
+            power_plugged=power_plugged,
         )
 
-        # Persist snapshot
+    async def collect_snapshot(self) -> SystemMetrics:
+        """Collect metrics, persist snapshot to SQLite DB, and check thresholds."""
+        metrics = await self.get_current_metrics()
+        now = datetime.now(timezone.utc)
+
+        # 1. Persist to DB
         session_factory = get_session_factory()
         async with session_factory() as session:
+            snapshot = SystemMetricsSnapshot(
+                cpu_pct=metrics.cpu_percent,
+                ram_pct=metrics.ram_percent,
+                disk_pct=metrics.disk_percent,
+                battery_pct=metrics.battery_percent,
+                timestamp=now,
+            )
             session.add(snapshot)
-            await session.commit()
 
-        # Emit metrics event
-        get_event_bus().publish_sync(
-            MetricsSnapshotEvent(
-                cpu_percent=cpu,
-                ram_percent=ram.percent,
-                disk_percent=disk.percent,
-                battery_percent=battery.percent if battery else None,
-            )
-        )
+            # 2. Threshold Alerts
+            event_bus = get_event_bus()
 
-        # Threshold checks
-        await self._check_thresholds(snapshot)
-        return snapshot
-
-    async def _check_thresholds(self, snapshot: SystemMetricsSnapshot) -> None:
-        """Evaluate thresholds and trigger alerts."""
-        event_bus = get_event_bus()
-
-        if snapshot.cpu_pct >= self.settings.cpu_high_threshold:
-            event_bus.publish_sync(
-                HighCpuAlertEvent(cpu_percent=snapshot.cpu_pct, threshold=self.settings.cpu_high_threshold)
-            )
-            await self._record_alert("high_cpu", f"CPU usage reached {snapshot.cpu_pct}%")
-
-        if snapshot.ram_pct >= self.settings.ram_high_threshold:
-            event_bus.publish_sync(
-                HighRamAlertEvent(ram_percent=snapshot.ram_pct, threshold=self.settings.ram_high_threshold)
-            )
-            await self._record_alert("high_ram", f"RAM usage reached {snapshot.ram_pct}%")
-
-        if snapshot.battery_pct is not None and snapshot.battery_pct <= self.settings.battery_low_threshold:
-            battery = psutil.sensors_battery()
-            if battery and not battery.power_plugged:
-                event_bus.publish_sync(
-                    LowBatteryAlertEvent(
-                        battery_percent=snapshot.battery_pct,
-                        threshold=self.settings.battery_low_threshold
+            if metrics.cpu_percent >= self.settings.cpu_high_threshold:
+                alert = SystemAlert(
+                    alert_type="cpu_high",
+                    message=f"CPU usage at {metrics.cpu_percent}% (threshold: {self.settings.cpu_high_threshold}%)",
+                    timestamp=now,
+                )
+                session.add(alert)
+                await event_bus.publish(
+                    HighCpuAlertEvent(
+                        cpu_percent=metrics.cpu_percent,
+                        threshold=self.settings.cpu_high_threshold,
                     )
                 )
-                await self._record_alert("low_battery", f"Battery low: {snapshot.battery_pct}% remaining")
 
-    async def _record_alert(self, alert_type: str, message: str) -> None:
-        """Save alert to database."""
-        session_factory = get_session_factory()
-        async with session_factory() as session:
-            alert = SystemAlert(
-                timestamp=datetime.now(timezone.utc),
-                alert_type=alert_type,
-                message=message,
-                acknowledged=False,
-            )
-            session.add(alert)
+            if metrics.ram_percent >= self.settings.ram_high_threshold:
+                alert = SystemAlert(
+                    alert_type="ram_high",
+                    message=f"RAM usage at {metrics.ram_percent}% (threshold: {self.settings.ram_high_threshold}%)",
+                    timestamp=now,
+                )
+                session.add(alert)
+                await event_bus.publish(
+                    HighRamAlertEvent(
+                        ram_percent=metrics.ram_percent,
+                        threshold=self.settings.ram_high_threshold,
+                    )
+                )
+
+            if (
+                metrics.battery_percent is not None
+                and metrics.battery_percent <= self.settings.battery_low_threshold
+                and not metrics.power_plugged
+            ):
+                alert = SystemAlert(
+                    alert_type="battery_low",
+                    message=f"Low battery warning: {metrics.battery_percent}% remaining",
+                    timestamp=now,
+                )
+                session.add(alert)
+                await event_bus.publish(
+                    LowBatteryAlertEvent(
+                        battery_percent=metrics.battery_percent,
+                        threshold=self.settings.battery_low_threshold,
+                    )
+                )
+
             await session.commit()
 
+        # Publish snapshot event
+        await get_event_bus().publish(MetricsSnapshotEvent(metrics=metrics))
+        return metrics
+
     async def _polling_loop(self) -> None:
-        """Background monitoring polling loop."""
-        logger.info("System Monitor service loop started")
+        logger.info("System Monitor service loop started", interval=self.settings.monitor_interval_sec)
         while self._is_running:
             try:
                 await self.collect_snapshot()
@@ -127,3 +148,14 @@ class SystemMonitorService:
             self._task.cancel()
             self._task = None
             logger.info("System Monitor service stopped")
+
+
+_system_monitor_instance: SystemMonitorService | None = None
+
+
+def get_system_monitor() -> SystemMonitorService:
+    """Get singleton SystemMonitorService instance."""
+    global _system_monitor_instance
+    if _system_monitor_instance is None:
+        _system_monitor_instance = SystemMonitorService()
+    return _system_monitor_instance

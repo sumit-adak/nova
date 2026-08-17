@@ -61,6 +61,10 @@ async def init_db(settings: Settings | None = None) -> None:
         await conn.run_sync(Base.metadata.create_all)
 
 
+# Alias
+init_database = init_db
+
+
 async def close_db() -> None:
     """Close the database engine."""
     global _engine, _session_factory

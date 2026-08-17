@@ -1,19 +1,58 @@
 """Tool executors package."""
+from nova_app.tools.executors.apps import (
+    ListApplicationsArgs,
+    OpenApplicationArgs,
+    list_applications_executor,
+    open_application_executor,
+)
+from nova_app.tools.executors.communication import (
+    DraftEmailArgs,
+    SendEmailArgs,
+    SendMessageArgs,
+    draft_email_executor,
+    send_email_executor,
+    send_message_executor,
+)
+from nova_app.tools.executors.dev import (
+    GitCommitArgs,
+    GitPushArgs,
+    GitStatusArgs,
+    OpenProjectArgs,
+    OpenTerminalArgs,
+    git_commit_executor,
+    git_push_executor,
+    git_status_executor,
+    open_project_executor,
+    open_terminal_executor,
+)
 from nova_app.tools.executors.files import (
+    GetFileInfoArgs,
     OpenFileArgs,
     OpenFolderArgs,
     SearchFilesArgs,
-    GetFileInfoArgs,
+    get_file_info_executor,
     open_file_executor,
     open_folder_executor,
     search_files_executor,
-    get_file_info_executor,
 )
-from nova_app.tools.executors.apps import (
-    OpenApplicationArgs,
-    ListApplicationsArgs,
-    open_application_executor,
-    list_applications_executor,
+from nova_app.tools.executors.media import (
+    PauseMusicArgs,
+    PlayMusicArgs,
+    StartTimerArgs,
+    TimerExpiredEvent,
+    pause_music_executor,
+    play_music_executor,
+    start_timer_executor,
+)
+from nova_app.tools.executors.memory import (
+    AddShortcutArgs,
+    GetPreferenceArgs,
+    ListPreferencesArgs,
+    SavePreferenceArgs,
+    add_shortcut_executor,
+    get_preference_executor,
+    list_preferences_executor,
+    save_preference_executor,
 )
 from nova_app.tools.executors.system import (
     GetSystemStatsArgs,
@@ -23,14 +62,13 @@ from nova_app.tools.executors.system import (
     set_volume_executor,
     take_screenshot_executor,
 )
-from nova_app.tools.executors.media import (
-    PlayMusicArgs,
-    PauseMusicArgs,
-    StartTimerArgs,
-    TimerExpiredEvent,
-    play_music_executor,
-    pause_music_executor,
-    start_timer_executor,
+from nova_app.tools.executors.web import (
+    FetchWebpageTextArgs,
+    OpenWebsiteArgs,
+    SearchWebArgs,
+    fetch_webpage_text_executor,
+    open_website_executor,
+    search_web_executor,
 )
 
 __all__ = [
@@ -59,4 +97,34 @@ __all__ = [
     "play_music_executor",
     "pause_music_executor",
     "start_timer_executor",
+    "OpenProjectArgs",
+    "OpenTerminalArgs",
+    "GitStatusArgs",
+    "GitCommitArgs",
+    "GitPushArgs",
+    "open_project_executor",
+    "open_terminal_executor",
+    "git_status_executor",
+    "git_commit_executor",
+    "git_push_executor",
+    "SavePreferenceArgs",
+    "GetPreferenceArgs",
+    "ListPreferencesArgs",
+    "AddShortcutArgs",
+    "save_preference_executor",
+    "get_preference_executor",
+    "list_preferences_executor",
+    "add_shortcut_executor",
+    "SearchWebArgs",
+    "OpenWebsiteArgs",
+    "FetchWebpageTextArgs",
+    "search_web_executor",
+    "open_website_executor",
+    "fetch_webpage_text_executor",
+    "DraftEmailArgs",
+    "SendEmailArgs",
+    "SendMessageArgs",
+    "draft_email_executor",
+    "send_email_executor",
+    "send_message_executor",
 ]
