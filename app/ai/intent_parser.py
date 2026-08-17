@@ -230,8 +230,8 @@ class OfflineIntentParser:
 
     def _split_compound_input(self, text: str) -> list[str]:
         """Split compound request on 'and then', 'then', or 'and'."""
-        # Don't split unified commands like "open and search ...", "open <engine> and search ...", or "open whatsapp and ..."
-        if re.match(r"^open (?:and search|\w+ and search|whatsapp and (?:search|find|send|write))\b", text, re.I):
+        # Don't split unified commands like "open and search ...", "open <engine> and search ...", "open spotify and play ...", or "open whatsapp and ..."
+        if re.match(r"^open (?:and search|\w+ and (?:search|play)|whatsapp and (?:search|find|send|write))\b", text, re.I):
             return [text]
         parts = re.split(r"\s+(?:and\s+then|then|and)\s+", text, flags=re.I)
         cleaned = [p.strip() for p in parts if p.strip()]

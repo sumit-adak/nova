@@ -61,13 +61,17 @@ class GrantsManager:
         session_factory = get_session_factory()
         now = datetime.now(timezone.utc)
         async with session_factory() as session:
-            stmt = select(PermissionGrant).where(PermissionGrant.tool_name == tool_name)
-            res = await session.execute(stmt)
-            grants = res.scalars().all()
+            try:
+                stmt = select(PermissionGrant).where(PermissionGrant.tool_name == tool_name)
+                res = await session.execute(stmt)
+                grants = res.scalars().all()
 
-            for g in grants:
-                if g.expires_at is None or g.expires_at > now:
-                    return True
+                for g in grants:
+                    if g.expires_at is None or g.expires_at > now:
+                        return True
+            except Exception as e:
+                logger.warning("Failed to check active grant from DB", error=str(e))
+                return False
 
         return False
 

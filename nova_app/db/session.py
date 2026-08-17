@@ -56,6 +56,7 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
 
 async def init_db(settings: Settings | None = None) -> None:
     """Initialize database tables."""
+    import nova_app.db.models  # noqa: F401
     engine = get_engine(settings)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
